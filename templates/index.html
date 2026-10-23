@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#192d28">
+  <title>LUMIQ AI — Studio thiết kế áo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v={{STATIC_VERSION}}">
+  <script src="/static/app.js?v={{STATIC_VERSION}}" defer></script>
+</head>
+<body>
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="LUMIQ AI trang chủ"><span class="brand-symbol" aria-hidden="true">L<span>✦</span></span>LUMIQ <span class="brand-ai">AI</span></a>
+      <span class="header-label">Studio thiết kế áo</span>
+    </header>
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <div><p class="eyebrow">Ý TƯỞNG CỦA BẠN. DẤU ẤN RIÊNG.</p><h1 id="page-title">Thiết kế chiếc áo <em>của bạn.</em></h1></div>
+        <p class="intro-note">Từ họa tiết yêu thích<br>đến một thiết kế hoàn chỉnh.</p>
+      </section>
+      <div class="workspace">
+        <form id="designForm" class="editor" novalidate>
+          <section class="panel" aria-labelledby="images-title">
+            <div class="section-heading"><span class="step">01</span><h2 id="images-title">Hình ảnh</h2><span class="section-meta">PNG, JPG, WEBP · ≤ 10 MB</span></div>
+            <div class="upload-grid">
+              <div class="upload-card">
+                <label class="preview-frame" for="shirt"><span id="shirtPlaceholder" class="preview-placeholder"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m16 8-11 7 5 10 6-3v18h16V22l6 3 5-10-11-7c-1 7-15 7-16 0Z"/></svg><span>Thêm ảnh áo</span></span><img id="shirtPreview" alt="Ảnh áo đã chọn" hidden></label>
+                <div class="upload-details"><div><h3>Áo gốc</h3><p id="shirtName">Chưa chọn ảnh</p></div><label class="file-action" for="shirt">Chọn ảnh</label></div>
+                <input id="shirt" name="shirt" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Chọn ảnh áo" required>
+              </div>
+              <div class="upload-card">
+                <label class="preview-frame" for="pattern"><span id="patternPlaceholder" class="preview-placeholder"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="7" width="34" height="34" rx="5"/><circle cx="17" cy="17" r="3"/><path d="m8 34 11-11 8 8 6-7 8 10"/></svg><span>Thêm họa tiết</span></span><img id="patternPreview" alt="Họa tiết đã chọn" hidden></label>
+                <div class="upload-details"><div><h3>Họa tiết</h3><p id="patternName">Chưa chọn ảnh</p></div><label class="file-action" for="pattern">Chọn ảnh</label></div>
+                <input id="pattern" name="pattern" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Chọn ảnh họa tiết" required>
+              </div>
+            </div>
+          </section>
+          <section class="panel" aria-labelledby="settings-title">
+            <div class="section-heading"><span class="step">02</span><h2 id="settings-title">Bố cục hình in</h2></div>
+            <div class="field-grid">
+              <div class="field"><div class="field-heading"><label for="centerX">Vị trí ngang</label><output id="centerXValue" for="centerX">50%</output></div><input id="centerX" name="center_x" type="range" min="0" max="100" value="50"></div>
+              <div class="field"><div class="field-heading"><label for="centerY">Vị trí dọc</label><output id="centerYValue" for="centerY">45%</output></div><input id="centerY" name="center_y" type="range" min="0" max="100" value="45"></div>
+              <div class="field field-wide"><div class="field-heading"><label for="printWidth">Kích thước họa tiết</label><output id="printWidthValue" for="printWidth">25%</output></div><input id="printWidth" name="print_width" type="range" min="1" max="100" value="25"></div>
+            </div>
+          </section>
+          <section class="panel color-panel" aria-labelledby="color-title">
+            <div class="section-heading"><span class="step">03</span><h2 id="color-title">Màu áo</h2></div>
+            <div class="field"><label class="sr-only" for="garmentColor">Chọn màu áo</label><select id="garmentColor" name="garment_color">{{COLOR_OPTIONS}}</select></div>
+          </section>
+          <button id="generate" class="primary-action" type="submit"><span>Tạo ảnh sản phẩm</span><span aria-hidden="true">✦</span></button>
+        </form>
+        <section class="result-panel" aria-labelledby="result-title">
+          <div class="result-heading"><div><p class="eyebrow">KHÔNG GIAN SÁNG TẠO</p><h2 id="result-title">Thiết kế của bạn</h2></div><span id="resultTag" class="result-tag">Xem trước</span></div>
+          <div class="result-stage" id="result"><div class="result-empty"><div class="empty-illustration" aria-hidden="true"><svg viewBox="0 0 160 160"><path d="m54 33-32 20 15 29 17-9v55h52V73l17 9 15-29-32-20c-5 18-47 18-52 0Z"/><path class="spark" d="m80 65 5 14 15 5-15 5-5 15-5-15-15-5 15-5Z"/></svg></div><strong>Một chiếc áo. Vô vàn ý tưởng.</strong><p>Thêm ảnh áo để bắt đầu thiết kế.</p></div></div>
+          <div class="result-footer"><p id="status" class="status" role="status" aria-live="polite">Sẵn sàng cho ý tưởng mới.</p><a id="download" class="download-action" href="#" download hidden>Tải ảnh PNG ↓</a></div>
+        </section>
+      </div>
+    </main>
+    <footer class="site-footer"><span>LUMIQ AI</span><span>Thiết kế theo cách của bạn.</span></footer>
+  </div>
+</body>
+</html>

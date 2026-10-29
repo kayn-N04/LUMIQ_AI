@@ -22,17 +22,30 @@ class LayoutPaletteTests(unittest.TestCase):
                 self.assertEqual(min(x for x, y in reds), 140)
                 self.assertEqual(max(x for x, y in reds), 159)
 
-    def test_all_palette_options_reach_prompt_and_page(self):
-        page = app.home().body.decode()
+    def test_rotation_is_applied_before_placement(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            Image.new("RGBA", (100, 100), "white").save(root / "shirt.png")
+            Image.new("RGBA", (20, 10), "red").save(root / "art.png")
+
+            bounds = build_layout(
+                root / "shirt.png", root / "art.png", root / "layout.png",
+                50, 50, 20, 90,
+            )
+
+            self.assertEqual(bounds, (40, 30, 60, 70))
+            with Image.open(root / "layout.png") as image:
+                self.assertEqual(image.getpixel((50, 32)), (255, 0, 0, 255))
+
+    def test_all_palette_options_reach_prompt_and_api(self):
+        palette = {item["name"]: item["hex"] for item in app.colors()["colors"]}
         self.assertEqual(len(COLORS), 6)
         for name, (code, description) in COLORS.items():
             prompt = build_design_prompt(name)
             self.assertIn(description if code else "unchanged", prompt)
             if code:
                 self.assertIn(code, prompt)
-            self.assertIn(f'value="{name}"', page)
-        self.assertNotIn('recolorEnabled', page)
-        self.assertNotIn('recolor.js', page)
+            self.assertEqual(palette[name], code)
 
     def test_pipeline_sends_placed_guide_not_plain_shirt(self):
         with tempfile.TemporaryDirectory() as temp:

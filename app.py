@@ -1,10 +1,8 @@
 """Máy chủ LUMIQ AI: tách nền họa tiết và tạo ảnh áo bằng AI."""
 
-import os
+import threading
 import logging
 import tempfile
-import threading
-import webbrowser
 from pathlib import Path
 from uuid import uuid4
 
@@ -22,7 +20,7 @@ from services.prompt_builder import COLORS
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
-# Các thư mục giao diện và ảnh; đường dẫn lấy theo vị trí file để chạy ở đâu cũng được.
+# Resolve storage relative to this service, independent of the working directory.
 OUTPUT_DIR = PROJECT_DIR / "output"
 STATIC_DIR = PROJECT_DIR / "static"
 PAGE_PATH = PROJECT_DIR / "templates" / "index.html"
@@ -32,6 +30,7 @@ app = FastAPI(title="LUMIQ AI")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 logger = logging.getLogger(__name__)
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+_generation_slots = threading.BoundedSemaphore(2)
 
 
 def _safe_file(directory: Path, name: str) -> Path:
@@ -43,18 +42,19 @@ def _safe_file(directory: Path, name: str) -> Path:
 
 
 @app.get("/", response_class=HTMLResponse)
-def home() -> HTMLResponse:
-    """Trả giao diện LUMIQ AI và danh sách màu áo."""
-    # URL thay đổi khi CSS/JS đổi, tránh trình duyệt dùng script cũ với HTML mới.
-    static_version = max(
-        (STATIC_DIR / "styles.css").stat().st_mtime_ns,
-        (STATIC_DIR / "app.js").stat().st_mtime_ns,
-    )
-    page = PAGE_PATH.read_text(encoding="utf-8")
-    options = "".join(f'<option value="{name}">{name}</option>' for name in COLORS)
-    page = page.replace("{{COLOR_OPTIONS}}", options)
-    page = page.replace("{{STATIC_VERSION}}", str(static_version))
-    return HTMLResponse(page, headers={"Cache-Control": "no-store"})
+def home():
+    return HTMLResponse(PAGE_PATH.read_text(encoding="utf-8"), headers={"Cache-Control": "no-store"})
+
+
+@app.get("/health")
+def health():
+    """Liveness only; does not call the paid AI provider."""
+    return {"status": "ok"}
+
+
+@app.get("/api/colors")
+def colors():
+    return {"colors": [{"name": name, "hex": value[0]} for name, value in COLORS.items()]}
 
 
 @app.get("/outputs/{name}")
@@ -71,9 +71,14 @@ async def generate_design(
     center_x: float = Form(50),
     center_y: float = Form(45),
     print_width: float = Form(25),
+    rotation: float = Form(0),
 ):
     """Nhận ảnh và lựa chọn thiết kế, tạo một ảnh sản phẩm bằng AI."""
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    if not _generation_slots.acquire(blocking=False):
+        await shirt.close()
+        await pattern.close()
+        return JSONResponse({"error": "Đang xử lý nhiều thiết kế. Vui lòng thử lại sau vài giây."},
+                            status_code=429, headers={"Retry-After": "5"})
     # Tên ngắn và ngẫu nhiên để các lượt tạo ảnh không ghi đè lên nhau.
     output_path = OUTPUT_DIR / f"ao-{uuid4().hex[:12]}.png"
     while output_path.exists():
@@ -81,6 +86,7 @@ async def generate_design(
 
     temp_paths: list[Path] = []
     try:
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         # Luồng AI đọc ảnh qua đường dẫn, nên lưu tạm rồi xóa sau khi xử lý.
         for upload in (shirt, pattern):
             suffix = Path(upload.filename or ".png").suffix or ".png"
@@ -95,7 +101,7 @@ async def generate_design(
         await run_in_threadpool(
             generate_ai_design,
             temp_paths[0], temp_paths[1], output_path, center_x, center_y, print_width,
-            garment_color,
+            garment_color, rotation,
         )
     except CloudflareAPIError as exc:
         return JSONResponse({"error": str(exc)}, status_code=exc.status_code)
@@ -109,6 +115,7 @@ async def generate_design(
         logger.exception("Image generation failed unexpectedly")
         return JSONResponse({"error": "Không thể xử lý ảnh. Kiểm tra cấu hình và nhật ký máy chủ."}, status_code=500)
     finally:
+        _generation_slots.release()
         for path in temp_paths:
             try:
                 path.unlink(missing_ok=True)
@@ -124,6 +131,4 @@ async def generate_design(
 
 
 if __name__ == "__main__":
-    if os.getenv("SUNEA_OPEN_BROWSER", "1") == "1":
-        threading.Timer(1.2, lambda: webbrowser.open("http://127.0.0.1:7860")).start()
     uvicorn.run(app, host="127.0.0.1", port=7860)

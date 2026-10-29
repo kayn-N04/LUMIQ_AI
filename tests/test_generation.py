@@ -137,9 +137,16 @@ class GenerationTests(unittest.TestCase):
 
     def test_invalid_controls_never_call_ai(self):
         from services.generation import generate_design
-        for color, x in [("red", 50), ("#123456", float("nan")), ("Giữ nguyên", 101)]:
+        invalid_options = [
+            ("red", 50, 0),
+            ("#123456", float("nan"), 0),
+            ("Giữ nguyên", 101, 0),
+            ("Giữ nguyên", 50, 181),
+            ("Giữ nguyên", 50, float("nan")),
+        ]
+        for color, x, angle in invalid_options:
             with patch("services.generation.CloudflareAIService") as service, self.assertRaises(ValueError):
-                generate_design(self.input, self.input, self.root / "out.png", x, 45, 25, color)
+                generate_design(self.input, self.input, self.root / "out.png", x, 45, 25, color, angle)
             service.assert_not_called()
 
     def test_provider_error_reaches_browser(self):
@@ -147,6 +154,16 @@ class GenerationTests(unittest.TestCase):
             response = client.post("/api/generate", files={"shirt": ("a.png", b"test"), "pattern": ("b.png", b"test")})
             self.assertEqual(response.status_code, 503)
             self.assertEqual(response.json()["error"], "busy")
+
+    def test_route_passes_rotation_to_generation(self):
+        with patch.object(app, "OUTPUT_DIR", self.root), patch.object(app, "generate_ai_design") as generate, TestClient(app.app) as client:
+            response = client.post(
+                "/api/generate",
+                data={"rotation": "37"},
+                files={"shirt": ("a.png", b"test"), "pattern": ("b.png", b"test")},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(generate.call_args.args[-1], 37)
 
 
 if __name__ == "__main__":

@@ -1,131 +1,246 @@
-// Các phần giao diện dùng chung.
-const form = document.querySelector('#designForm');
-const generateButton = document.querySelector('#generate');
-const statusElement = document.querySelector('#status');
-const resultElement = document.querySelector('#result');
-const downloadLink = document.querySelector('#download');
+const shirtInput = document.querySelector("#shirt-file");
+const patternInput = document.querySelector("#pattern-file");
+const shirtPreview = document.querySelector("#shirt-preview");
+const patternPreview = document.querySelector("#pattern-preview");
+const shirtName = document.querySelector("#shirt-name");
+const patternName = document.querySelector("#pattern-name");
+const colorOptions = document.querySelector("#color-options");
+const generateButton = document.querySelector("#generate-button");
+const buttonLabel = document.querySelector("#button-label");
+const message = document.querySelector("#message");
+const resultImage = document.querySelector("#result-image");
+const emptyState = document.querySelector("#empty-state");
+const loadingState = document.querySelector("#loading-state");
+const previewTitle = document.querySelector("#preview-title");
+const mockupPreview = document.querySelector("#mockup-preview");
+const mockupStage = document.querySelector("#mockup-stage");
+const mockupShirt = document.querySelector("#mockup-shirt");
+const mockupPattern = document.querySelector("#mockup-pattern");
+const resultCanvas = document.querySelector(".result-canvas");
+const downloadLink = document.querySelector("#download-link");
+const selectedColorLabel = document.querySelector("#selected-color");
+const centerX = document.querySelector("#center-x");
+const centerY = document.querySelector("#center-y");
+const printWidth = document.querySelector("#print-width");
+const rotation = document.querySelector("#rotation");
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+let selectedColor = "Giữ nguyên";
+const previewUrls = { shirt: null, pattern: null };
 
-// Hiển thị ảnh vừa chọn; khi chưa có file thì giữ khung hướng dẫn tải ảnh.
-function setupImagePreview(inputId, previewId, placeholderId, nameId) {
-  const input = document.getElementById(inputId);
-  const preview = document.getElementById(previewId);
-  const placeholder = document.getElementById(placeholderId);
-  const name = document.getElementById(nameId);
-  let previousUrl = null;
-
-  input.addEventListener('change', () => {
-    downloadLink.hidden = true;
-    if (previousUrl) URL.revokeObjectURL(previousUrl);
-    const file = input.files[0];
-    if (!file) {
-      preview.removeAttribute('src');
-      preview.hidden = true;
-      placeholder.hidden = false;
-      name.textContent = 'Chưa chọn file';
-      previousUrl = null;
-      renderCompositePreview();
-      return;
-    }
-    previousUrl = URL.createObjectURL(file);
-    preview.src = previousUrl;
-    preview.hidden = false;
-    placeholder.hidden = true;
-    name.textContent = file.name;
-  });
-  preview.addEventListener('load', renderCompositePreview);
-  preview.addEventListener('error', () => {
-    resultElement.replaceChildren();
-    setStatus('Không đọc được ảnh xem trước. Vui lòng chọn PNG, JPEG hoặc WebP hợp lệ.', 'error');
-  });
+function showMessage(text) {
+  message.textContent = text;
 }
 
-function renderCompositePreview() {
+function resetResult() {
+  resultImage.hidden = true;
   downloadLink.hidden = true;
-  const shirt = document.getElementById('shirtPreview');
-  const pattern = document.getElementById('patternPreview');
-  if (shirt.hidden || !shirt.complete || !shirt.naturalWidth) {
-    resultElement.replaceChildren();
+  resultImage.removeAttribute("src");
+  updatePlacementPreview();
+}
+
+function updatePlacementPreview() {
+  previewTitle.textContent = resultImage.hidden ? "Xem trước" : "Kết quả";
+  const shirtUrl = previewUrls.shirt;
+  if (!shirtUrl) {
+    mockupPreview.hidden = true;
+    mockupPattern.hidden = true;
+    emptyState.hidden = false;
     return;
   }
-  const canvas = document.createElement('canvas');
-  const ratio = Math.min(1, 1000 / Math.max(shirt.naturalWidth, shirt.naturalHeight));
-  canvas.width = Math.max(1, Math.round(shirt.naturalWidth * ratio));
-  canvas.height = Math.max(1, Math.round(shirt.naturalHeight * ratio));
-  canvas.setAttribute('aria-label', 'Xem trước vị trí họa tiết trên ảnh gốc');
-  const context = canvas.getContext('2d');
-  context.drawImage(shirt, 0, 0, canvas.width, canvas.height);
-  if (!pattern.hidden && pattern.complete && pattern.naturalWidth) {
-    const w = shirt.naturalWidth, h = shirt.naturalHeight;
-    const scale = Math.min(w * Number(document.getElementById('printWidth').value) / 100 / pattern.naturalWidth, h / pattern.naturalHeight);
-    const pw = Math.max(1, Math.round(pattern.naturalWidth * scale));
-    const ph = Math.max(1, Math.round(pattern.naturalHeight * scale));
-    const x = Math.max(0, Math.min(w - pw, Math.floor(w * Number(document.getElementById('centerX').value) / 100 - pw / 2 + 0.5)));
-    const y = Math.max(0, Math.min(h - ph, Math.floor(h * Number(document.getElementById('centerY').value) / 100 - ph / 2 + 0.5)));
-    context.drawImage(pattern, x * canvas.width / w, y * canvas.height / h, pw * canvas.width / w, ph * canvas.height / h);
+
+  mockupPreview.hidden = false;
+  emptyState.hidden = true;
+  if (mockupShirt.getAttribute("src") !== shirtUrl) {
+    mockupShirt.onload = updatePlacementPreview;
+    mockupShirt.src = shirtUrl;
   }
-  resultElement.replaceChildren(canvas);
-  document.getElementById('resultTag').textContent = 'Xem trước';
-  setStatus('Bản xem trước bố cục.');
-}
 
-function setStatus(message, type = '') {
-  statusElement.textContent = message;
-  statusElement.className = type ? `status status--${type}` : 'status';
-}
-
-function setLoading(isLoading) {
-  form.querySelectorAll('input, select, button').forEach(element => { element.disabled = isLoading; });
-  generateButton.querySelector('span').textContent = isLoading ? 'Đang tạo ảnh…' : 'Tạo ảnh sản phẩm';
-}
-
-// Chỉ đưa ảnh thành phẩm vào khung kết quả; không chèn HTML từ phản hồi API.
-function showResult(imageUrl) {
-  const image = document.createElement('img');
-  image.src = `${imageUrl}?t=${Date.now()}`;
-  image.alt = 'Ảnh sản phẩm áo hoàn thiện';
-  resultElement.replaceChildren(image);
-  downloadLink.href = imageUrl;
-  downloadLink.hidden = false;
-}
-
-async function handleSubmit(event) {
-  event.preventDefault();
-  const shirtInput = document.getElementById('shirt');
-  const patternInput = document.getElementById('pattern');
-  if (!shirtInput.files.length || !patternInput.files.length) {
-    setStatus('Vui lòng chọn đủ ảnh áo và ảnh họa tiết.', 'error');
-    (shirtInput.files.length ? patternInput : shirtInput).focus();
+  const patternUrl = previewUrls.pattern;
+  if (!patternUrl) {
+    mockupPattern.hidden = true;
     return;
   }
-  const data = new FormData(form);
-  setLoading(true);
-  setStatus('Đang tạo thiết kế…');
-  document.getElementById('resultTag').textContent = 'Đang tạo';
+  if (mockupPattern.getAttribute("src") !== patternUrl) {
+    mockupPattern.onload = updatePlacementPreview;
+    mockupPattern.src = patternUrl;
+  }
+  if (!mockupShirt.naturalWidth || !mockupPattern.naturalWidth) return;
+
+  const shirtWidth = mockupShirt.naturalWidth;
+  const shirtHeight = mockupShirt.naturalHeight;
+  const patternWidth = mockupPattern.naturalWidth;
+  const patternHeight = mockupPattern.naturalHeight;
+  const degrees = Math.abs(Number(rotation.value));
+  let rotatedWidth = patternWidth;
+  let rotatedHeight = patternHeight;
+  if (degrees === 90) {
+    rotatedWidth = patternHeight;
+    rotatedHeight = patternWidth;
+  } else if (degrees !== 0 && degrees !== 180) {
+    const angle = degrees * Math.PI / 180;
+    const cosine = Math.abs(Math.cos(angle)) < 1e-12 ? 0 : Math.abs(Math.cos(angle));
+    const sine = Math.abs(Math.sin(angle)) < 1e-12 ? 0 : Math.abs(Math.sin(angle));
+    rotatedWidth = 2 * Math.ceil(
+      cosine * patternWidth / 2 + sine * patternHeight / 2,
+    );
+    rotatedHeight = 2 * Math.ceil(
+      sine * patternWidth / 2 + cosine * patternHeight / 2,
+    );
+  }
+  const scale = Math.min(
+    shirtWidth * Number(printWidth.value) / 100 / rotatedWidth,
+    shirtHeight / rotatedHeight,
+  );
+  const placedWidth = Math.max(1, Math.floor(rotatedWidth * scale + .5));
+  const placedHeight = Math.max(1, Math.floor(rotatedHeight * scale + .5));
+  const left = Math.max(0, Math.min(
+    shirtWidth - placedWidth,
+    Math.floor(shirtWidth * Number(centerX.value) / 100 - placedWidth / 2 + .5),
+  ));
+  const top = Math.max(0, Math.min(
+    shirtHeight - placedHeight,
+    Math.floor(shirtHeight * Number(centerY.value) / 100 - placedHeight / 2 + .5),
+  ));
+
+  mockupStage.style.setProperty("--shirt-ratio", `${shirtWidth} / ${shirtHeight}`);
+  mockupStage.style.width = `${Math.max(1, Math.min(resultCanvas.clientWidth - 34, 300 * shirtWidth / shirtHeight))}px`;
+  const imageWidth = patternWidth * scale / shirtWidth * 100;
+  const imageHeight = patternHeight * scale / shirtHeight * 100;
+  mockupPattern.style.left = `${(left + placedWidth / 2) / shirtWidth * 100 - imageWidth / 2}%`;
+  mockupPattern.style.top = `${(top + placedHeight / 2) / shirtHeight * 100 - imageHeight / 2}%`;
+  mockupPattern.style.width = `${imageWidth}%`;
+  mockupPattern.style.height = `${imageHeight}%`;
+  mockupPattern.style.transform = `rotate(${rotation.value}deg)`;
+  mockupPattern.hidden = false;
+}
+
+function setPreview(input, preview, nameLabel, currentUrl) {
+  const file = input.files[0];
+  if (!file) return currentUrl;
+
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+    input.value = "";
+    showMessage("Vui lòng chọn ảnh PNG, JPG hoặc WebP.");
+    return currentUrl;
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    input.value = "";
+    showMessage("Mỗi ảnh chỉ được tải lên tối đa 10 MB.");
+    return currentUrl;
+  }
+
+  if (currentUrl) URL.revokeObjectURL(currentUrl);
+  const previewUrl = URL.createObjectURL(file);
+  preview.replaceChildren();
+  const image = document.createElement("img");
+  image.src = previewUrl;
+  image.alt = "";
+  preview.append(image);
+  preview.classList.add("has-image");
+  nameLabel.textContent = file.name;
+  showMessage("");
+  return previewUrl;
+}
+
+shirtInput.addEventListener("change", () => {
+  const url = setPreview(shirtInput, shirtPreview, shirtName, previewUrls.shirt);
+  if (url !== previewUrls.shirt) {
+    previewUrls.shirt = url;
+    resetResult();
+  }
+});
+patternInput.addEventListener("change", () => {
+  const url = setPreview(patternInput, patternPreview, patternName, previewUrls.pattern);
+  if (url !== previewUrls.pattern) {
+    previewUrls.pattern = url;
+    resetResult();
+  }
+});
+window.addEventListener("pagehide", () => {
+  Object.values(previewUrls).forEach((url) => {
+    if (url) URL.revokeObjectURL(url);
+  });
+});
+window.addEventListener("resize", () => {
+  if (!mockupPreview.hidden) updatePlacementPreview();
+});
+
+document.querySelectorAll(".range-grid input").forEach((input) => {
+  const output = document.querySelector(`#${input.id}-value`);
+  input.addEventListener("input", () => {
+    output.value = input.id === "rotation" ? `${input.value}°` : `${input.value}%`;
+    resetResult();
+  });
+});
+
+async function loadColors() {
+  const response = await fetch("/api/colors");
+  if (!response.ok) throw new Error("Không thể tải danh sách màu áo.");
+  const data = await response.json();
+
+  for (const color of data.colors) {
+    const button = document.createElement("button");
+    button.className = "color-choice";
+    button.type = "button";
+    button.setAttribute("aria-label", color.name);
+    button.setAttribute("aria-pressed", String(color.name === selectedColor));
+    button.title = color.name;
+    if (color.hex) button.style.backgroundColor = color.hex;
+    button.addEventListener("click", () => {
+      selectedColor = color.name;
+      selectedColorLabel.textContent = color.name;
+      colorOptions.querySelectorAll("button").forEach((option) => {
+        option.setAttribute("aria-pressed", String(option === button));
+      });
+    });
+    colorOptions.append(button);
+  }
+}
+
+generateButton.addEventListener("click", async () => {
+  const shirt = shirtInput.files[0];
+  const pattern = patternInput.files[0];
+  if (!shirt || !pattern) {
+    showMessage("Hãy tải lên đủ ảnh áo và ảnh họa tiết trước nhé.");
+    return;
+  }
+
+  const form = new FormData();
+  form.append("shirt", shirt);
+  form.append("pattern", pattern);
+  form.append("garment_color", selectedColor);
+  form.append("center_x", centerX.value);
+  form.append("center_y", centerY.value);
+  form.append("print_width", printWidth.value);
+  form.append("rotation", rotation.value);
+
+  showMessage("");
+  resetResult();
+  previewTitle.textContent = "Kết quả";
+  emptyState.hidden = true;
+  mockupPreview.hidden = true;
+  loadingState.hidden = false;
+  generateButton.disabled = true;
+  buttonLabel.textContent = "Đang tạo thiết kế...";
 
   try {
-    const response = await fetch('/api/generate', { method: 'POST', body: data });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error || 'Không thể tạo ảnh.');
-
-    showResult(body.image_url);
-    document.getElementById('resultTag').textContent = 'Hoàn tất';
-    setStatus(body.status || 'Đã tạo xong ảnh sản phẩm.', 'success');
+    const response = await fetch("/api/generate", { method: "POST", body: form });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || data.detail || "Không thể tạo ảnh. Vui lòng thử lại.");
+    }
+    resultImage.src = data.image_url;
+    resultImage.hidden = false;
+    downloadLink.href = data.image_url;
+    downloadLink.hidden = false;
   } catch (error) {
-    document.getElementById('resultTag').textContent = 'Chưa hoàn tất';
-    setStatus(`Không tạo được ảnh: ${error.message}`, 'error');
+    updatePlacementPreview();
+    showMessage(error instanceof Error ? error.message : "Đã có lỗi xảy ra. Vui lòng thử lại.");
   } finally {
-    setLoading(false);
+    loadingState.hidden = true;
+    generateButton.disabled = false;
+    buttonLabel.textContent = "Tạo thiết kế";
   }
-}
+});
 
-setupImagePreview('shirt', 'shirtPreview', 'shirtPlaceholder', 'shirtName');
-setupImagePreview('pattern', 'patternPreview', 'patternPlaceholder', 'patternName');
-form.addEventListener('submit', handleSubmit);
-for (const id of ['centerX', 'centerY', 'printWidth']) {
-  document.getElementById(id).addEventListener('input', event => {
-    document.getElementById(`${id}Value`).textContent = `${event.target.value}%`;
-    renderCompositePreview();
-  });
-}
-
-document.getElementById('garmentColor').addEventListener('change', renderCompositePreview);
+loadColors().catch((error) => showMessage(error.message));

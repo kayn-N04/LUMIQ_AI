@@ -1,5 +1,7 @@
 """Chuẩn bị hai ảnh tham chiếu, gọi Cloudflare AI và lưu ảnh sản phẩm."""
 
+import atexit
+import threading
 import base64
 import io
 import os
@@ -15,6 +17,20 @@ DEFAULT_MODEL = "@cf/black-forest-labs/flux-2-klein-4b"
 MAX_INPUT_EDGE = 1024
 # Giữ đầu ra 512 px: mức thử nghiệm gọn, không giảm thêm làm hình/chữ quá khó nhìn.
 DEFAULT_OUTPUT_EDGE = 512
+
+
+_client = None
+_client_lock = threading.Lock()
+
+
+def get_http_client():
+    global _client
+    with _client_lock:
+        if _client is None:
+            _client = httpx.Client(trust_env=False, timeout=httpx.Timeout(180, connect=15, pool=15),
+                                   limits=httpx.Limits(max_connections=4, max_keepalive_connections=2))
+            atexit.register(_client.close)
+        return _client
 
 
 class CloudflareAPIError(RuntimeError):
@@ -111,13 +127,9 @@ class CloudflareAIService:
 
         try:
             # Không dùng proxy hệ thống vì proxy cục bộ có thể không hoạt động.
-            with httpx.Client(trust_env=False, timeout=180) as client:
-                response = client.post(
-                    self.endpoint,
-                    headers=headers,
-                    data=data,
-                    files=files,
-                )
+            response = get_http_client().post(
+                self.endpoint, headers=headers, data=data, files=files,
+            )
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             try:
